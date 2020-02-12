@@ -1,0 +1,94 @@
+---
+title: "Analysis"
+author: "Pranjal"
+date: "2/2/2019"
+output: html_document
+---
+
+```{r initial_setup, cache=FALSE, message = FALSE, warning = FALSE}
+library(glmnet);library(survival);library(survminer);library(readxl);library(ggplot2); library(GGally)
+library(knitr); library(rmdformats); library(magrittr)
+library(skimr); library(Hmisc); library(Epi); library(vcd)
+library(tidyverse) 
+
+## Global options
+
+options(max.print="75")
+opts_chunk$set(comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+
+
+skimr::skim_with(numeric = list(hist = NULL),
+                 integer = list(hist = NULL))
+```
+
+
+```{r }
+train11 <- read.csv("train11.csv")
+#train <- na.omit(train1)
+train11 %>%
+  select(time) %>%
+  summary()
+```
+```{r}
+train11$diedcancer = ifelse(train11$status==2, 1, 0)
+source("stdca.R")
+
+
+Srv = Surv(train11$time, train11$status) 
+coxmod = coxph(Srv ~ Rad , data=train11) 
+
+train11$pr_failure18 = c(1- (summary(survfit(coxmod,
+newdata=train11), times=1095)$surv)) 
+
+cr = stdca(data=train11, outcome="diedcancer", ttoutcome="time", timepoint=1095,predictors="pr_failure18",cmprsk=TRUE, xstop=0.8, smooth=TRUE) 
+
+
+coxmod = coxph(Srv ~ path , data=train11) 
+
+train11$pr_failure18 = c(1- (summary(survfit(coxmod,
+newdata=train11), times=1095)$surv)) 
+
+km = stdca(data=train11, outcome="diedcancer", ttoutcome="time", timepoint=1095,predictors="pr_failure18",cmprsk=TRUE, xstop=0.8, smooth=TRUE) 
+
+coxmod = coxph(Srv ~ Rad + path , data=train11) 
+
+train11$pr_failure18 = c(1- (summary(survfit(coxmod,
+newdata=train11), times=1095)$surv)) 
+
+rp = stdca(data=train11, outcome="diedcancer", ttoutcome="time", timepoint=1095,predictors="pr_failure18",cmprsk=TRUE, xstop=0.8, smooth=TRUE) 
+
+coxmod = coxph(Srv ~ Rad + path + T.Stage + LVI, data=train11) 
+
+train11$pr_failure18 = c(1- (summary(survfit(coxmod,
+newdata=train11), times=1095)$surv)) 
+
+rps = stdca(data=train11, outcome="diedcancer", ttoutcome="time", timepoint=1095,predictors="pr_failure18",cmprsk=TRUE, xstop=0.8, smooth=TRUE) 
+
+plot(km$net.benefit.threshold, km$net.benefit.none, type = "l", lwd=2,
+xlim=c(0,.7), ylim=c(0,.3), xlab = "Threshold Probability",
+ylab = "Net Benefit")
+
+lines(km$net.benefit$threshold, km$net.benefit$all, type="l", col=8, lwd=2)
+
+lines(km$net.benefit$threshold, km$net.benefit$all, type="l", col=8, lwd=2)
+
+lines(km$net.benefit$threshold, km$net.benefit$pr_failure18, type="l", col=3, lty=2)
+
+lines(cr$net.benefit$threshold, cr$net.benefit$pr_failure18, type="l", col =4, lty=2)
+
+lines(rp$net.benefit$threshold, rp$net.benefit$pr_failure18,col=2, type="l", lty=1)
+
+lines(rps$net.benefit$threshold, rps$net.benefit$pr_failure18,col=9, type="l", lty=1)
+
+legend("topright", cex=0.7, legend=c("None", "All", "path Model", "rad Model", "rad-path model", "rad-path-clinical" ), col=c(8, 8, 3, 4, 2, 9), lwd=c(2, 2, 1, 1, 1, 1), lty=c(1, 1, 2, 2, 1,1)) 
+
+```
+```{r}
+#result2 = stdca(data=train11, outcome="diedcancer", ttoutcome="time", timepoint=1095, predictors="path", probability=FALSE, xstop=.6)
+#result3 = stdca(data=train11, outcome="diedcancer", ttoutcome="time", timepoint=1095, predictors="stage", probability=FALSE, xstop=.6)
+
+```
+
